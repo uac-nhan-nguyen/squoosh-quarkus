@@ -130,6 +130,8 @@ class SquooshResource {
                     else -> ImageType.jpeg
                 },
                 resizeWidth = width,
+                resizeHeight = height,
+                quality = quality,
         ));
 
         if (Files.exists(convertedFilepath)) {

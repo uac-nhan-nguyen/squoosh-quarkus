@@ -39,7 +39,7 @@ class Squoosh {
                 "squoosh-cli", filepath,
                 "--suffix", suffix,
                 "-d", outputDirectory,
-                "--$method", "{${if (options.quality != null) "quality:${options.quality};" else ""} }",
+                "--$method", "{${if (options.quality != null) "quality:${options.quality}" else ""} }",
                 if (resize != null) "--resize" else null,
                 resize,
         ).filterNotNull());
