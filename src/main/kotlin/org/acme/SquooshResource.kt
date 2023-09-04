@@ -2,16 +2,18 @@ package org.acme
 
 import jakarta.ws.rs.*
 import jakarta.ws.rs.core.*
-import jdk.jfr.ContentType
 import java.io.InputStream
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path as FilePath
 import java.nio.file.StandardCopyOption
-import kotlin.io.path.absolutePathString
 
 
-data class ImageResult(val url: String, val contentType: String)
+data class ImageResult(
+        val webp: String,
+        val jpg: String,
+        val png: String,
+)
 
 fun createDirectoryIfNotExists(directory: String) {
     val path = FileSystems.getDefault().getPath(directory);
@@ -31,6 +33,8 @@ fun createDirectoryIfNotExists(directory: String) {
 class SquooshResource {
     val uploadDirectory = ".files/uploads"
     val webpDirectory = ".files/webp"
+    val jpgDirectory = ".files/jpg"
+    val pngDirectory = ".files/png"
 
     /**
      * POST method to accept image in body as binary
@@ -54,8 +58,11 @@ class SquooshResource {
 
         Files.copy(inputStream, uploadPath, StandardCopyOption.REPLACE_EXISTING)
 
-        val ext = if (contentType == "image/jpeg") ".jpeg" else ".png"
-        return ImageResult("${baseUri}squoosh/$filename$ext", contentType)
+        return ImageResult(
+                "${baseUri}squoosh/$filename.webp",
+                "${baseUri}squoosh/$filename.jpg",
+                "${baseUri}squoosh/$filename.png",
+        )
     }
 
     /**
@@ -79,24 +86,31 @@ class SquooshResource {
      */
     @GET
     @Path("{filename}.{ext}")
-    fun convert(filename: String, ext: String): Response {
+    fun convert(
+            filename: String, ext: String,
+            @QueryParam("width") width: Int?,
+            @QueryParam("height") height: Int?,
+            @QueryParam("quality") quality: Int?,
+    ): Response {
         val directory = when (ext) {
-            "jpeg" -> uploadDirectory
-            "png" -> uploadDirectory
+            "jpg" -> jpgDirectory
+            "png" -> pngDirectory
             "webp" -> webpDirectory
             else -> uploadDirectory
         }
 
-        val path = FileSystems.getDefault().getPath(directory, "$filename.$ext");
+        val suffix = "${if (width != null) "-w=$width" else ""}${if (height != null) "-h=$height" else ""}${if (quality != null) "-q=$quality" else ""}"
+
+        val convertedFilepath = FileSystems.getDefault().getPath(directory, "$filename$suffix.$ext");
         val contentType = when (ext) {
-            "jpeg" -> "image/jpeg"
+            "jpg" -> "image/jpeg"
             "png" -> "image/png"
             "webp" -> "image/webp"
             else -> "image/jpeg"
         }
 
-        if (Files.exists(path)) {
-            return Response.ok(Files.newInputStream(path), contentType).build()
+        if (Files.exists(convertedFilepath)) {
+            return Response.ok(Files.newInputStream(convertedFilepath), contentType).build()
         }
 
 
@@ -108,21 +122,20 @@ class SquooshResource {
         /// convert image using squoosh cli
         val squoosh = Squoosh()
         createDirectoryIfNotExists(directory)
-        squoosh.convert(uploadPath.toString(), directory, when (ext) {
-            "jpeg" -> ImageType.jpeg
-            "png" -> ImageType.png
-            "webp" -> ImageType.webp
-            else -> ImageType.jpeg
-        });
+        squoosh.convert(uploadPath.toString(), suffix, directory, ConvertOptions(
+                when (ext) {
+                    "jpg" -> ImageType.jpeg
+                    "png" -> ImageType.png
+                    "webp" -> ImageType.webp
+                    else -> ImageType.jpeg
+                },
+                resizeWidth = width,
+        ));
 
-        if (Files.exists(path)) {
-            return Response.ok(Files.newInputStream(path), contentType).build()
+        if (Files.exists(convertedFilepath)) {
+            return Response.ok(Files.newInputStream(convertedFilepath), contentType).build()
+        } else {
+            throw Exception("Image not found after conversion");
         }
-
-        return Response.status(Response.Status.BAD_REQUEST)
-                .entity("Cannot convert image")
-                .build()
     }
-
-
 }

@@ -8,9 +8,41 @@ enum class ImageType {
     jpeg, png, webp
 }
 
+data class ConvertOptions(val type: ImageType,
+                          val resizeWidth: Int? = null,
+                          val resizeHeight: Int? = null,
+                          val quality: Int? = null)
+
 class Squoosh {
-    fun convert(filepath: String, outputDirectory: String, type: ImageType) {
-        runCommand(listOf("squoosh-cli", filepath, "-d", outputDirectory, "--$type", "{ }"));
+    fun convert(filepath: String, suffix: String, outputDirectory: String, options: ConvertOptions) {
+        // squoosh-cli -d output input/cbbca148-6b69-492f-8bfa-70346ebc7a41.jpeg --webp "{}"
+        // squoosh-cli -d output input/cbbca148-6b69-492f-8bfa-70346ebc7a41.jpeg --mozjpeg "{}"
+        // squoosh-cli -d output input/cbbca148-6b69-492f-8bfa-70346ebc7a41.jpeg --mozjpeg "{}" --resize '{width:200}'
+
+        val method = when (options.type) {
+            ImageType.jpeg -> "mozjpeg"
+            ImageType.png -> "oxipng"
+            ImageType.webp -> "webp"
+        }
+
+        val resize = if (options.resizeWidth != null && options.resizeHeight != null) {
+            "{width:${options.resizeWidth}, height:${options.resizeHeight}}"
+        } else if (options.resizeWidth != null) {
+            "{width:${options.resizeWidth}}"
+        } else if (options.resizeHeight != null) {
+            "{height:${options.resizeHeight}}"
+        } else {
+            null
+        }
+
+        runCommand(listOf<String?>(
+                "squoosh-cli", filepath,
+                "--suffix", suffix,
+                "-d", outputDirectory,
+                "--$method", "{${if (options.quality != null) "quality:${options.quality};" else ""} }",
+                if (resize != null) "--resize" else null,
+                resize,
+        ).filterNotNull());
     }
 
     fun runCommand(command: List<String>) {
