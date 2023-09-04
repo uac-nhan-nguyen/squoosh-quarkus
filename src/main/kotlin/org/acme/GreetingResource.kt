@@ -5,10 +5,12 @@ import jakarta.ws.rs.Path
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
 
+data class Hello(val message: String);
+
 @Path("/hello")
 class GreetingResource {
 
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    fun hello() = "Hello from RESTEasy Reactive"
+    @Produces(MediaType.APPLICATION_JSON)
+    fun hello() = Hello("Hello from RESTEasy Reactive")
 }

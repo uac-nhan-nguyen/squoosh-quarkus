@@ -1,4 +1,4 @@
-# code-with-quarkus
+# Squoosh API with quarkus and kotlin
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
