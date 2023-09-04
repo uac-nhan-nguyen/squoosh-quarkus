@@ -62,8 +62,24 @@ class SquooshResource {
      * GET method to return the uploaded image as jpeg
      */
     @GET
+    @Path("{filename}")
+    fun get(filename: String): Response {
+        val path = FileSystems.getDefault().getPath(uploadDirectory, filename);
+
+        if (Files.exists(path)) {
+            return Response.ok(Files.newInputStream(path), "image/jpeg").build()
+        } else {
+            return Response.status(Response.Status.NOT_FOUND).build()
+        }
+    }
+
+
+    /**
+     * GET method to return the uploaded image as jpeg
+     */
+    @GET
     @Path("{filename}.{ext}")
-    fun get(filename: String, ext: String): Response {
+    fun convert(filename: String, ext: String): Response {
         val directory = when (ext) {
             "jpeg" -> uploadDirectory
             "png" -> uploadDirectory
@@ -107,5 +123,6 @@ class SquooshResource {
                 .entity("Cannot convert image")
                 .build()
     }
+
 
 }
