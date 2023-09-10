@@ -4,3 +4,6 @@ import io.quarkus.test.junit.QuarkusIntegrationTest
 
 @QuarkusIntegrationTest
 class GreetingResourceIT : GreetingResourceTest()
+
+@QuarkusIntegrationTest
+class SquooshResourceIT : SquooshResourceTest()

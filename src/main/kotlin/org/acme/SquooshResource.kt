@@ -7,12 +7,11 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path as FilePath
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 
 data class ImageResult(
-        val webp: String,
-        val jpg: String,
-        val png: String,
+    val filename: String,
 )
 
 fun createDirectoryIfNotExists(directory: String) {
@@ -20,12 +19,9 @@ fun createDirectoryIfNotExists(directory: String) {
     if (!Files.exists(path)) {
         try {
             Files.createDirectories(path)
-            println("Directory created: $path")
         } catch (e: Exception) {
             println("Error creating directory: ${e.message}")
         }
-    } else {
-        println("Directory already exists: $path")
     }
 }
 
@@ -43,25 +39,26 @@ class SquooshResource {
      * - return a JSON with the URL of the stored image
      */
     @PUT
-    @Path("{filename}")
     @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.MEDIA_TYPE_WILDCARD)
-    fun store(filename: String, inputStream: InputStream, @Context urlInfo: UriInfo, headers: HttpHeaders): ImageResult {
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    fun put(
+        @FormParam("file") inputStream: InputStream,
+        @Context urlInfo: UriInfo,
+        headers: HttpHeaders
+    ): ImageResult {
         val baseUri = urlInfo.baseUri;
 
-        // Define the path where you want to store the uploaded file
         val contentType = headers.getHeaderString("content-type")
-
         createDirectoryIfNotExists(uploadDirectory)
 
+        val filename = "image-${System.currentTimeMillis()}-${(Math.random() * 1000).toInt()}"
         val uploadPath = FilePath.of(uploadDirectory, filename)
+        println("Uploading file to: $uploadPath");
 
         Files.copy(inputStream, uploadPath, StandardCopyOption.REPLACE_EXISTING)
 
         return ImageResult(
-                "${baseUri}squoosh/$filename.webp",
-                "${baseUri}squoosh/$filename.jpg",
-                "${baseUri}squoosh/$filename.png",
+            filename,
         )
     }
 
@@ -87,10 +84,10 @@ class SquooshResource {
     @GET
     @Path("{filename}.{ext}")
     fun convert(
-            filename: String, ext: String,
-            @QueryParam("width") width: Int?,
-            @QueryParam("height") height: Int?,
-            @QueryParam("quality") quality: Int?,
+        filename: String, ext: String,
+        @QueryParam("width") width: Int?,
+        @QueryParam("height") height: Int?,
+        @QueryParam("quality") quality: Int?,
     ): Response {
         val directory = when (ext) {
             "jpg" -> jpgDirectory
@@ -99,7 +96,8 @@ class SquooshResource {
             else -> uploadDirectory
         }
 
-        val suffix = "${if (width != null) "-w=$width" else ""}${if (height != null) "-h=$height" else ""}${if (quality != null) "-q=$quality" else ""}"
+        val suffix =
+            "${if (width != null) "-w=$width" else ""}${if (height != null) "-h=$height" else ""}${if (quality != null) "-q=$quality" else ""}"
 
         val convertedFilepath = FileSystems.getDefault().getPath(directory, "$filename$suffix.$ext");
         val contentType = when (ext) {
@@ -122,7 +120,8 @@ class SquooshResource {
         /// convert image using squoosh cli
         val squoosh = Squoosh()
         createDirectoryIfNotExists(directory)
-        squoosh.convert(uploadPath.toString(), suffix, directory, ConvertOptions(
+        squoosh.convert(
+            uploadPath.toString(), suffix, directory, ConvertOptions(
                 when (ext) {
                     "jpg" -> ImageType.jpeg
                     "png" -> ImageType.png
@@ -132,7 +131,8 @@ class SquooshResource {
                 resizeWidth = width,
                 resizeHeight = height,
                 quality = quality,
-        ));
+            )
+        );
 
         if (Files.exists(convertedFilepath)) {
             return Response.ok(Files.newInputStream(convertedFilepath), contentType).build()
